@@ -33,6 +33,15 @@
 
 using namespace gsl;
 
+template <typename T>
+struct is_cvref
+{
+    enum
+    {
+        value = std::is_reference<T>::value || std::is_const<T>::value || std::is_volatile<T>::value
+    };
+};
+
 TEST_CASE("sanity check for gsl::index typedef")
 {
     static_assert(std::is_same<gsl::index, std::ptrdiff_t>::value,
@@ -46,6 +55,34 @@ TEST_CASE("finally_lambda")
     int i = 0;
     {
         auto _ = finally([&]() { f(i); });
+        static_assert(!is_cvref<decltype(_)::invoked_function_type>::value,
+                      "invoked_function_type should not be cvref");
+        CHECK(i == 0);
+    }
+    CHECK(i == 1);
+}
+
+TEST_CASE("finally_lambda_lvalue")
+{
+    int i = 0;
+    {
+        auto action = [&]() { f(i); };
+        auto _ = finally(action);
+        static_assert(!is_cvref<decltype(_)::invoked_function_type>::value,
+                      "invoked_function_type should not be cvref");
+        CHECK(i == 0);
+    }
+    CHECK(i == 1);
+}
+
+TEST_CASE("finally_lambda_const_lvalue")
+{
+    int i = 0;
+    {
+        const auto action = [&]() { f(i); };
+        auto _ = finally(action);
+        static_assert(!is_cvref<decltype(_)::invoked_function_type>::value,
+                      "invoked_function_type should not be cvref");
         CHECK(i == 0);
     }
     CHECK(i == 1);
@@ -75,6 +112,8 @@ TEST_CASE("finally_function_with_bind")
     int i = 0;
     {
         auto _ = finally(std::bind(&f, std::ref(i)));
+        static_assert(!is_cvref<decltype(_)::invoked_function_type>::value,
+                      "invoked_function_type should not be cvref");
         CHECK(i == 0);
     }
     CHECK(i == 1);
@@ -87,6 +126,8 @@ TEST_CASE("finally_function_ptr")
     j = 0;
     {
         auto _ = finally(&g);
+        static_assert(!is_cvref<decltype(_)::invoked_function_type>::value,
+                      "invoked_function_type should not be cvref");
         CHECK(j == 0);
     }
     CHECK(j == 1);

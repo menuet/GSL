@@ -51,6 +51,8 @@ template <class F>
 class final_action
 {
 public:
+    using invoked_function_type = F;
+
     explicit final_action(F f) noexcept : f_(std::move(f)) {}
 
     final_action(final_action&& other) noexcept : f_(std::move(other.f_)), invoke_(other.invoke_)
@@ -74,17 +76,26 @@ private:
 };
 
 // finally() - convenience function to generate a final_action
+//#define TRY_WITH_BUG // DEFINE THIS TO SEE THAT TEST CASE "finally_lambda_lvalue" fails to compile
+#ifdef TRY_WITH_BUG
 template <class F>
-final_action<F> finally(const F& f) noexcept
+final_action<F> finally(const F& f) noexcept // SELECTED ONLY WITH A CONST LAMBDA
 {
     return final_action<F>(f);
 }
 
 template <class F>
-final_action<F> finally(F&& f) noexcept
+final_action<F> finally(F&& f) noexcept // SELECTED FOR OTHER CASES (PROBLEM FOR F WITH NON CONST LVALUE LAMBDAS)
 {
     return final_action<F>(std::forward<F>(f));
 }
+#else
+template <class F>
+final_action<typename std::decay<F>::type> finally(F&& f) noexcept
+{
+    return final_action<typename std::decay<F>::type>(std::forward<F>(f));
+}
+#endif
 
 // narrow_cast(): a searchable way to do narrowing casts of values
 template <class T, class U>
